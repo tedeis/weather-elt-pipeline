@@ -12,6 +12,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
@@ -53,13 +54,48 @@ col1.metric("Cities tracked", f"{df['city'].nunique()}")
 col2.metric("Forecast days", f"{df['forecast_date'].nunique()}")
 col3.metric("Last ingested (UTC)", str(df["last_ingested_at"].max())[:16])
 
+def _legend_columns(n_series: int) -> int:
+    # wrap the legend into a grid instead of one long row so it never
+    # clips on narrow (mobile) screens -- 3 per row reads fine down to
+    # phone width for city-name-length labels
+    return max(1, min(3, n_series))
+
+
 st.subheader("Average temperature by day")
-temp_pivot = filtered.pivot(index="forecast_date", columns="city", values="avg_temperature_c")
-st.line_chart(temp_pivot)
+temp_chart = (
+    alt.Chart(filtered)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("forecast_date:T", title=None),
+        y=alt.Y("avg_temperature_c:Q", title="°C"),
+        color=alt.Color(
+            "city:N",
+            title=None,
+            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+        ),
+        tooltip=["forecast_date:T", "city:N", "avg_temperature_c:Q"],
+    )
+    .properties(height=320)
+)
+st.altair_chart(temp_chart, use_container_width=True)
 
 st.subheader("Max wind speed by day")
-wind_pivot = filtered.pivot(index="forecast_date", columns="city", values="max_wind_speed_kmh")
-st.bar_chart(wind_pivot)
+wind_chart = (
+    alt.Chart(filtered)
+    .mark_bar()
+    .encode(
+        x=alt.X("forecast_date:T", title=None),
+        y=alt.Y("max_wind_speed_kmh:Q", title="km/h"),
+        color=alt.Color(
+            "city:N",
+            title=None,
+            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+        ),
+        tooltip=["forecast_date:T", "city:N", "max_wind_speed_kmh:Q"],
+    )
+    .properties(height=320)
+)
+st.altair_chart(wind_chart, use_container_width=True)
 
 st.subheader("Gold layer (daily, per city)")
 st.dataframe(filtered, use_container_width=True)
