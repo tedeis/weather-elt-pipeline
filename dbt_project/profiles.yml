@@ -1,0 +1,16 @@
+weather_medallion:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      # dbt-duckdb resolves a relative path against the process's current
+      # working directory at connect time -- NOT against --project-dir or
+      # --profiles-dir. That makes a relative path fragile: it works when
+      # you happen to `cd dbt_project` first, and silently points one
+      # directory too high when invoked from the repo root (which is how
+      # run_pipeline.py, ds/run_ds_pipeline.py, and CI all call dbt).
+      # DBT_DUCKDB_PATH is set to an absolute path by every caller in this
+      # repo; the relative fallback only matters if you run `dbt` by hand
+      # from inside dbt_project/.
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../data/weather.duckdb') }}"
+      threads: 4

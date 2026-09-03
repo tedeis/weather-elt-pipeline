@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: bronze_historical
+    schema: bronze
+    tables:
+      - name: weather_historical_raw
+        description: >
+          Raw Open-Meteo Archive API responses (actual observed daily
+          weather, ERA5 reanalysis), one row per (city, backfill run).
+          Landed untouched, same bronze pattern as weather_raw. This is
+          the DS project's training data source, and later doubles as the
+          "ground truth" side of the forecast-accuracy-by-lead-time
+          comparison against weather_raw's forecasts.
+        columns:
+          - name: ingested_at
+            description: UTC timestamp when this backfill request was made.
+          - name: city
+            description: City name, same reference list as the DE pipeline.
+          - name: raw_response
+            description: Full raw JSON response body from the Archive API.

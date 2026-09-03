@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: gold_weather_daily
+    description: Daily per-city weather aggregates for dashboarding and reporting.
+    columns:
+      - name: city_date_key
+        description: Surrogate key (md5 of city + forecast_date) enforcing one row per city per day.
+        tests:
+          - not_null
+          - unique
+      - name: city
+        tests:
+          - not_null
+      - name: forecast_date
+        tests:
+          - not_null
+      - name: avg_temperature_c
+        tests:
+          - not_null

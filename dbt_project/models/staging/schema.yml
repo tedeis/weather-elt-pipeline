@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: stg_weather_hourly
+    description: One row per city per forecast hour, typed and deduplicated to the latest ingestion run.
+    columns:
+      - name: city
+        tests:
+          - not_null
+      - name: forecast_time
+        tests:
+          - not_null
+      - name: temperature_c
+        tests:
+          - not_null
+      - name: wind_speed_kmh
+        tests:
+          - not_null

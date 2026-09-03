@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: stg_weather_historical_daily
+    description: One row per city per actual calendar date (ERA5 reanalysis), deduplicated to the latest backfill run.
+    columns:
+      - name: city
+        tests:
+          - not_null
+      - name: observed_date
+        tests:
+          - not_null
+      - name: temperature_mean_c
+        tests:
+          - not_null

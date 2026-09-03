@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: weather_raw
+        description: >
+          Raw Open-Meteo API responses, one row per (city, ingestion run).
+          Untouched JSON payload plus ingestion metadata. No parsing or
+          type-casting happens above this layer's source definition.
+        columns:
+          - name: ingested_at
+            description: UTC timestamp when this API call was made.
+          - name: city
+            description: City name as defined in ingestion/cities.py.
+          - name: raw_response
+            description: Full raw JSON response body from Open-Meteo.
