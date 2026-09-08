@@ -110,7 +110,7 @@ accumulates to retrain on a growing dataset.
 ## Why these choices
 
 - **DuckDB** instead of a hosted warehouse: zero cost, zero setup, and the
-  whole pipeline is reproducible by anyone who clones the repo — no cloud
+  whole pipeline is reproducible by anyone who clones the repo no cloud
   account needed to run it locally.
 - **dbt** for all silver/gold logic: SQL-based transforms, version
   controlled, tested, and documented the way a real data team would do it,
