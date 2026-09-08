@@ -11,7 +11,7 @@ questions about the forecasts this pipeline collects: how good are they,
 and can a purpose-built model beat them on next-day temperature? See
 [DS project](#data-science-extension) below.
 
-**Live dashboard:** _add your Streamlit Community Cloud URL here after deploying_
+**Live dashboard:**
 
 ## Architecture
 
