@@ -22,4 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Visit the dashboard to reset its inactivity timer
-        run: curl -sSL -o /dev/null -w "HTTP %{http_code}\n" https://tedeis-weather-dashboard.streamlit.app
+        # Plain curl (no cookie jar, default curl user-agent) gets stuck
+        # in an infinite redirect loop against Streamlit Community Cloud
+        # -- its routing layer expects a persistent session cookie across
+        # the redirect chain, and a non-browser user-agent trips it up
+        # too. -c/-b give curl a cookie jar to carry across redirects,
+        # and -A sends a normal browser-like user-agent.
+        run: |
+          curl -sSL \
+            -c cookies.txt -b cookies.txt \
+            -A "Mozilla/5.0 (compatible; keep-alive-ping/1.0)" \
+            -o /dev/null -w "HTTP %{http_code}\n" \
+            https://tedeis-weather-dashboard.streamlit.app
