@@ -180,7 +180,7 @@ temp_chart = (
     .mark_line(point=True)
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("avg_temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=0, titlePadding=10)),
+        y=alt.Y("avg_temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=0, titlePadding=40)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -215,7 +215,7 @@ hourly_chart = (
     .mark_line()
     .encode(
         x=alt.X("forecast_time:T", title=None),
-        y=alt.Y("temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=0, titlePadding=10)),
+        y=alt.Y("temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=0, titlePadding=40)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -240,7 +240,7 @@ wind_chart = (
     .mark_bar()
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("max_wind_speed_kmh:Q", axis=alt.Axis(title="km/h", titleAngle=0, titlePadding=10)),
+        y=alt.Y("max_wind_speed_kmh:Q", axis=alt.Axis(title="km/h", titleAngle=0, titlePadding=40)),
         color=alt.Color(
             "city:N",
             title=None,
