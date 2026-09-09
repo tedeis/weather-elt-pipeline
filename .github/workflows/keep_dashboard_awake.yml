@@ -1,0 +1,25 @@
+name: Keep dashboard awake
+
+# Streamlit Community Cloud hibernates apps after ~12 hours with no
+# traffic, and pushing commits does not reset that timer -- only actual
+# visits do (per Streamlit's own docs and community moderators). This
+# pings the deployed app every 6 hours, comfortably under that 12-hour
+# threshold even accounting for occasional GitHub Actions scheduling
+# delays, so it stays warm for anyone opening the link (e.g. from a
+# resume) instead of showing them a "wake this app up" screen first.
+#
+# Separate from pipeline.yml on purpose: that workflow refreshes data,
+# this one just keeps the deployed app reachable -- different concerns,
+# different schedules.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Visit the dashboard to reset its inactivity timer
+        run: curl -sSL -o /dev/null -w "HTTP %{http_code}\n" https://tedeis-weather-dashboard.streamlit.app
