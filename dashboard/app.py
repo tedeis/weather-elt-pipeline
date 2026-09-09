@@ -9,6 +9,8 @@ never touches raw or intermediate data.
 
 from pathlib import Path
 
+import math
+
 import altair as alt
 import duckdb
 import pandas as pd
@@ -88,10 +90,16 @@ col3.metric("Last ingested (UTC)", str(df["last_ingested_at"].max())[:16])
 
 
 def _legend_columns(n_series: int) -> int:
-    # wrap the legend into a grid instead of one long row so it never
-    # clips on narrow (mobile) screens -- 3 per row reads fine down to
-    # phone width for city-name-length labels
-    return max(1, min(3, n_series))
+    # Wrap the legend into a grid sized to the number of selected cities,
+    # aiming for at most ~8 rows regardless of how many cities are picked
+    # -- 3 columns is fine for a handful of cities, but pinning it at 3
+    # forever means selecting a lot of cities produces a legend many rows
+    # tall that clips against the chart's fixed-height container. More
+    # cities selected -> more columns -> the legend grows wide instead of
+    # tall.
+    if n_series <= 3:
+        return max(1, n_series)
+    return max(3, math.ceil(n_series / 8))
 
 
 st.subheader("Average temperature by day")
@@ -105,11 +113,21 @@ temp_chart = (
             "city:N",
             title=None,
             scale=COLOR_SCALE,
-            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+            # Restrict the legend to just the cities currently selected --
+            # the scale's domain stays the full city list (so colors never
+            # shift as the selection changes), but without this the legend
+            # renders every domain value, i.e. all 54+ cities, regardless
+            # of what's actually plotted.
+            legend=alt.Legend(
+                orient="bottom",
+                direction="horizontal",
+                columns=_legend_columns(len(selected_cities)),
+                values=selected_cities,
+            ),
         ),
         tooltip=["forecast_date:T", "city:N", "avg_temperature_c:Q"],
     )
-    .properties(height=320)
+    .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
 )
 st.altair_chart(temp_chart, use_container_width=True)
 
@@ -124,11 +142,16 @@ wind_chart = (
             "city:N",
             title=None,
             scale=COLOR_SCALE,
-            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+            legend=alt.Legend(
+                orient="bottom",
+                direction="horizontal",
+                columns=_legend_columns(len(selected_cities)),
+                values=selected_cities,
+            ),
         ),
         tooltip=["forecast_date:T", "city:N", "max_wind_speed_kmh:Q"],
     )
-    .properties(height=320)
+    .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
 )
 st.altair_chart(wind_chart, use_container_width=True)
 
