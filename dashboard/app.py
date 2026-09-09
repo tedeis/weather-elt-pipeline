@@ -100,6 +100,13 @@ with st.sidebar:
         max_value=max_forecast_date,
     )
 
+    st.divider()
+    temperature_unit = st.radio(
+        "Temperature unit",
+        ["Celsius (°C)", "Fahrenheit (°F)"],
+        horizontal=True,
+    )
+
 if not selected_cities:
     st.info("Select at least one city in the sidebar to see its charts.")
     st.stop()
@@ -126,6 +133,28 @@ filtered_hourly = df_hourly[
     & df_hourly["forecast_time"].dt.date.between(start_date, end_date)
 ]
 
+# gold_weather_daily/gold_weather_hourly always store temperature in
+# Celsius (that's what the API returns and what the dbt models compute) --
+# the unit toggle only changes what's *displayed*, so convert into new
+# columns here rather than touching the underlying _c columns, keeping a
+# single source of truth for the raw data.
+_is_fahrenheit = temperature_unit.startswith("Fahrenheit")
+TEMP_UNIT_LABEL = "°F" if _is_fahrenheit else "°C"
+
+
+def _to_display_temp(celsius: pd.Series) -> pd.Series:
+    return celsius * 9 / 5 + 32 if _is_fahrenheit else celsius
+
+
+filtered = filtered.assign(
+    avg_temperature_display=_to_display_temp(filtered["avg_temperature_c"]),
+    min_temperature_display=_to_display_temp(filtered["min_temperature_c"]),
+    max_temperature_display=_to_display_temp(filtered["max_temperature_c"]),
+)
+filtered_hourly = filtered_hourly.assign(
+    temperature_display=_to_display_temp(filtered_hourly["temperature_c"]),
+)
+
 col1, col2, col3 = st.columns(3)
 col1.metric("Cities tracked", f"{df['city'].nunique()}")
 col2.metric("Cities shown", f"{len(selected_cities)}")
@@ -151,7 +180,7 @@ temp_chart = (
     .mark_line(point=True)
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("avg_temperature_c:Q", axis=alt.Axis(title="°C", titleAngle=-90, titlePadding=10)),
+        y=alt.Y("avg_temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=-90, titlePadding=10)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -174,7 +203,7 @@ temp_chart = (
                 symbolLimit=500,
             ),
         ),
-        tooltip=["forecast_date:T", "city:N", "avg_temperature_c:Q"],
+        tooltip=["forecast_date:T", "city:N", alt.Tooltip("avg_temperature_display:Q", title=f"Avg temp ({TEMP_UNIT_LABEL})")],
     )
     .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
 )
@@ -186,7 +215,7 @@ hourly_chart = (
     .mark_line()
     .encode(
         x=alt.X("forecast_time:T", title=None),
-        y=alt.Y("temperature_c:Q", axis=alt.Axis(title="°C", titleAngle=-90, titlePadding=10)),
+        y=alt.Y("temperature_display:Q", axis=alt.Axis(title=TEMP_UNIT_LABEL, titleAngle=-90, titlePadding=10)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -199,7 +228,7 @@ hourly_chart = (
                 symbolLimit=500,
             ),
         ),
-        tooltip=["forecast_time:T", "city:N", "temperature_c:Q"],
+        tooltip=["forecast_time:T", "city:N", alt.Tooltip("temperature_display:Q", title=f"Temp ({TEMP_UNIT_LABEL})")],
     )
     .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
 )
@@ -231,4 +260,11 @@ wind_chart = (
 st.altair_chart(wind_chart, use_container_width=True)
 
 st.subheader("Gold layer (daily, per city)")
-st.dataframe(filtered, use_container_width=True)
+table_df = filtered.drop(
+    columns=["avg_temperature_display", "min_temperature_display", "max_temperature_display"]
+).copy()
+table_df[f"avg_temperature ({TEMP_UNIT_LABEL})"] = filtered["avg_temperature_display"].round(1)
+table_df[f"min_temperature ({TEMP_UNIT_LABEL})"] = filtered["min_temperature_display"].round(1)
+table_df[f"max_temperature ({TEMP_UNIT_LABEL})"] = filtered["max_temperature_display"].round(1)
+table_df = table_df.drop(columns=["avg_temperature_c", "min_temperature_c", "max_temperature_c"])
+st.dataframe(table_df, use_container_width=True)
