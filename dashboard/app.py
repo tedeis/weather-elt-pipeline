@@ -19,10 +19,10 @@ DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 
 st.set_page_config(page_title="Weather Medallion Pipeline", page_icon="🌦️", layout="wide")
 
-st.title("🌦️ Weather Medallion Pipeline")
+st.title("Weather Medallion Pipeline")
 st.caption(
     "Bronze → Silver → Gold ELT pipeline on top of the Open-Meteo API. "
-    "Ingestion runs daily via GitHub Actions; this dashboard reads only "
+    "Ingestion runs daily via GitHub Actions"
     "from the gold layer."
 )
 
