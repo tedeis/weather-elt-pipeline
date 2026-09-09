@@ -14,8 +14,8 @@ import streamlit as st
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 
-st.set_page_config(page_title="Forecast Model", page_icon="📈", layout="wide")
-st.title("📈 Next-Day Temperature Forecasting Model")
+st.set_page_config(page_title="Forecast Model", page_icon=None, layout="wide")
+st.title("Next-Day Temperature Forecasting Model")
 st.caption(
     "Persistence baseline vs. linear regression vs. XGBoost, evaluated on a "
     "chronological hold-out (never a random split, to avoid leaking future "

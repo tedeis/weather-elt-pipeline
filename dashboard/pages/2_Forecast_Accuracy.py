@@ -15,8 +15,8 @@ import streamlit as st
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 
-st.set_page_config(page_title="Forecast Accuracy", page_icon="🎯", layout="wide")
-st.title("🎯 Forecast Accuracy by Lead Time")
+st.set_page_config(page_title="Forecast Accuracy", page_icon=None, layout="wide")
+st.title("Forecast Accuracy by Lead Time")
 st.caption(
     "Does Open-Meteo's own forecast get less accurate the further out it "
     "predicts? Built from the DE pipeline's append-only forecast snapshots "

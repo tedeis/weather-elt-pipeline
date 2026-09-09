@@ -19,7 +19,7 @@ import streamlit as st
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 
-st.set_page_config(page_title="Weather Dashboard", page_icon="🌦️", layout="wide")
+st.set_page_config(page_title="Weather Dashboard", page_icon=None, layout="wide")
 
 st.title("Weather Dashboard")
 st.caption(
