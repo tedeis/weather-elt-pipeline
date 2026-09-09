@@ -18,7 +18,7 @@ st.set_page_config(page_title="Forecast Model", page_icon=None, layout="wide")
 st.title("Next-Day Temperature Forecasting Model")
 st.caption(
     "Persistence baseline vs. linear regression vs. XGBoost, evaluated on a "
-    "chronological hold-out (never a random split, to avoid leaking future "
+    "chronological hold-out (to avoid leaking future "
     "data into training). Trained by `ds/train.py`."
 )
 
