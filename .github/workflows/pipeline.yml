@@ -46,6 +46,14 @@ jobs:
         # at least once, which creates the historical-actuals bronze table
         # this depends on. continue-on-error keeps a fresh clone of this repo
         # (no DS backfill yet) from failing the whole scheduled run.
+        #
+        # ds/backfill_historical.py re-runs here too, not just once at setup:
+        # it's what advances silver.stg_weather_historical_daily's actuals
+        # forward each day (ERA5 finalizes ~5 days behind "today"). Without
+        # this, the actuals side of the forecast-accuracy join freezes at
+        # whatever date the one-time setup backfill happened to run on, and
+        # gold.forecast_accuracy_by_lead_time never gets new overlap no
+        # matter how long the forecast side keeps accumulating snapshots.
         continue-on-error: true
         env:
           # dbt-duckdb resolves profiles.yml's db path against the process's
@@ -53,6 +61,7 @@ jobs:
           # sidesteps that regardless of where this step runs from.
           DBT_DUCKDB_PATH: ${{ github.workspace }}/data/weather.duckdb
         run: |
+          python3 ds/backfill_historical.py
           dbt run --select tag:ds --project-dir dbt_project --profiles-dir dbt_project
           python3 ds/eval_forecast_accuracy.py
 

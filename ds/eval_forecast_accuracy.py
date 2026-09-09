@@ -6,12 +6,20 @@ degrade the further out they predict?"
 
 The DE pipeline's bronze.weather_raw table is append-only -- every daily
 run keeps its own snapshot rather than overwriting the last one. Because
-each snapshot includes a 3-day-ahead hourly forecast, the same calendar
-date ends up predicted multiple times at different lead times (e.g. a
-Monday forecast for Wednesday has a 2-day lead time; Tuesday's forecast
-for that same Wednesday has a 1-day lead time). Once the historical
-archive backfill (or the daily accuracy job below) has the actual value
-for that date, we can measure error as a function of lead time.
+each snapshot includes a multi-day-ahead hourly forecast, the same
+calendar date ends up predicted multiple times at different lead times
+(e.g. a Monday forecast for Wednesday has a 2-day lead time; Tuesday's
+forecast for that same Wednesday has a 1-day lead time). Once the
+historical archive backfill (or the daily accuracy job below) has the
+actual value for that date, we can measure error as a function of lead
+time.
+
+This reads from silver.stg_weather_hourly_history rather than
+silver.stg_weather_hourly. stg_weather_hourly deliberately deduplicates
+down to each city's latest ingestion run (correct for "what's the
+forecast right now" on the main dashboard), which throws away exactly the
+multi-snapshot history this comparison depends on --
+stg_weather_hourly_history keeps every ingestion run instead.
 
 Important honesty note: this table starts EMPTY (or nearly empty) right
 after this project is published, and only becomes meaningful after the
@@ -48,17 +56,20 @@ def _table_exists(con: duckdb.DuckDBPyConnection, schema: str, table: str) -> bo
 
 
 def build_accuracy_table(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    # Both sides are optional depending on what's been run so far: the DE
-    # pipeline (run_pipeline.py) creates stg_weather_hourly, the DS backfill
-    # (ds/run_ds_pipeline.py) creates stg_weather_historical_daily. Either
-    # can legitimately not exist yet -- treat that the same as "no overlap
-    # yet" rather than crashing, since it's just as expected right after a
-    # fresh clone as an empty join result is.
-    if not _table_exists(con, "silver", "stg_weather_hourly"):
+    # Both sides are optional depending on what's been run so far: the
+    # ds-tagged dbt models (built by `dbt run --select tag:ds`, i.e.
+    # ds/run_ds_pipeline.py, or the workflow's "Update forecast-accuracy-by
+    # -lead-time table" step) create both stg_weather_hourly_history (needs
+    # bronze.weather_raw, landed by the DE pipeline's ingestion step) and
+    # stg_weather_historical_daily (needs the DS backfill). Either can
+    # legitimately not exist yet -- treat that the same as "no overlap yet"
+    # rather than crashing, since it's just as expected right after a fresh
+    # clone as an empty join result is.
+    if not _table_exists(con, "silver", "stg_weather_hourly_history"):
         print(
-            "[info] silver.stg_weather_hourly doesn't exist yet -- run "
-            "`python3 run_pipeline.py` (the DE pipeline) at least once so "
-            "there are forecast snapshots to compare against."
+            "[info] silver.stg_weather_hourly_history doesn't exist yet -- run "
+            "`dbt run --select tag:ds` (or ds/run_ds_pipeline.py) at least once "
+            "so there are forecast snapshots to compare against."
         )
         return pd.DataFrame(columns=EMPTY_ACCURACY_COLUMNS)
 
@@ -77,7 +88,7 @@ def build_accuracy_table(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
             cast(forecast_time as date) as forecast_date,
             cast(ingested_at as date)   as forecast_made_on,
             avg(temperature_c)          as forecast_temperature_c
-        from silver.stg_weather_hourly
+        from silver.stg_weather_hourly_history
         group by city, cast(forecast_time as date), cast(ingested_at as date)
         """
     ).df()

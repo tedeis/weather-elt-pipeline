@@ -2,12 +2,20 @@
 Open-Meteo's free Archive API (ERA5 reanalysis), for the same cities the DE
 pipeline forecasts.
 
-Unlike the DE pipeline's forecast ingestion, this is a one-time (or
-occasional) backfill, not a daily job -- it pulls years of history in a
-single run rather than accumulating one snapshot per day. Run it once to
-build the DS training set:
+Unlike the DE pipeline's forecast ingestion, this pulls years of history in
+a single run rather than accumulating one hourly snapshot per day. Run it
+once by hand to build the DS training set:
 
     python3 ds/backfill_historical.py --years 2
+
+It's also re-run daily by the scheduled GitHub Actions workflow (see
+.github/workflows/pipeline.yml's "Update forecast-accuracy-by-lead-time
+table" step) -- not to rebuild years of history from scratch each time, but
+because end_date is always "today - ARCHIVE_LAG_DAYS": each re-run is what
+advances the confirmed-actuals frontier forward as new days finalize, which
+is what lets gold.forecast_accuracy_by_lead_time keep gaining overlap with
+the DE pipeline's forecast snapshots instead of freezing at whatever date
+the first backfill happened to run on.
 
 No API key required. Same bronze-layer philosophy as fetch_weather.py:
 land the raw JSON untouched, let dbt do the parsing/typing in the silver

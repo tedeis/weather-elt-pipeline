@@ -16,3 +16,23 @@ models:
       - name: wind_speed_kmh
         tests:
           - not_null
+
+  - name: stg_weather_hourly_history
+    description: >
+      One row per (city, ingestion run, forecast hour) -- the full
+      append-only forecast snapshot history, not deduplicated to the latest
+      run. Feeds ds/eval_forecast_accuracy.py's forecast-accuracy-by-lead-time
+      comparison; the main dashboard should keep reading stg_weather_hourly.
+    columns:
+      - name: city
+        tests:
+          - not_null
+      - name: forecast_time
+        tests:
+          - not_null
+      - name: ingested_at
+        tests:
+          - not_null
+      - name: temperature_c
+        tests:
+          - not_null
