@@ -9,9 +9,9 @@ never touches raw or intermediate data.
 
 from pathlib import Path
 
+import altair as alt
 import duckdb
 import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -19,11 +19,11 @@ DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 
 st.set_page_config(page_title="Weather Medallion Pipeline", page_icon="🌦️", layout="wide")
 
-st.title("🌦️ Weather Medallion Pipeline")
+st.title("Weather Medallion Pipeline")
 st.caption(
     "Bronze → Silver → Gold ELT pipeline on top of the Open-Meteo API. "
-    "Ingestion runs daily via GitHub Actions; this dashboard reads only "
-    "from the gold layer."
+    "Ingestion runs daily via GitHub Actions"
+    " from the gold layer."
 )
 
 
@@ -47,21 +47,24 @@ df = load_gold()
 
 cities = sorted(df["city"].unique())
 
-# Give every city a fixed color, assigned once over the full city list (not
-# just the current selection) so a city's color never shifts around as you
-# add/remove other cities from the picker -- Albuquerque is always the same
-# blue whether it's the only city selected or one of forty.
-PALETTE = px.colors.qualitative.Alphabet + px.colors.qualitative.Dark24
+# Fixed, qualitative palette (D3 category20 + category20b) assigned once
+# over the full city list, not just the current selection, so a given
+# city's color never shifts around as you add/remove other cities from
+# the picker -- Albuquerque is always the same color whether it's the
+# only city selected or one of forty.
+PALETTE = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+    "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5", "#c49c94", "#f7b6d2", "#c7c7c7", "#dbdb8d", "#9edae5",
+    "#393b79", "#5254a3", "#6b6ecf", "#9c9ede", "#637939", "#8ca252", "#b5cf6b", "#cedb9c", "#8c6d31", "#bd9e39",
+    "#e7ba52", "#e7cb94", "#843c39", "#ad494a", "#d6616b", "#e7969c", "#7b4173", "#a55194", "#ce6dbd", "#de9ed6",
+]
 CITY_COLORS = {city: PALETTE[i % len(PALETTE)] for i, city in enumerate(cities)}
+COLOR_SCALE = alt.Scale(domain=cities, range=[CITY_COLORS[c] for c in cities])
 
-# With dozens of cities now tracked, defaulting the multiselect to "all of
-# them" makes the charts unreadable, so start with a small, readable subset.
-# Use the sidebar (not the main column) so the picker doesn't compete for
-# width with the charts, and swap Streamlit's native line/bar charts for
-# Plotly: unlike the native charts -- which cut the legend off after ~20
-# entries with a plain "...N entries" label -- Plotly's legend scrolls, and
-# clicking a city name in it toggles that one city on/off directly on the
-# chart without touching the picker.
+# With dozens of cities now tracked, defaulting the picker to "all of them"
+# makes the charts unreadable, so start with a small, readable subset and
+# put the picker in the sidebar so it doesn't compete for width with the
+# charts.
 DEFAULT_CITY_COUNT = 6
 with st.sidebar:
     st.header("Filter")
@@ -83,31 +86,51 @@ col1.metric("Cities tracked", f"{df['city'].nunique()}")
 col2.metric("Cities shown", f"{len(selected_cities)}")
 col3.metric("Last ingested (UTC)", str(df["last_ingested_at"].max())[:16])
 
+
+def _legend_columns(n_series: int) -> int:
+    # wrap the legend into a grid instead of one long row so it never
+    # clips on narrow (mobile) screens -- 3 per row reads fine down to
+    # phone width for city-name-length labels
+    return max(1, min(3, n_series))
+
+
 st.subheader("Average temperature by day")
-temp_fig = px.line(
-    filtered.sort_values("forecast_date"),
-    x="forecast_date",
-    y="avg_temperature_c",
-    color="city",
-    color_discrete_map=CITY_COLORS,
-    markers=True,
-    labels={"forecast_date": "Forecast date", "avg_temperature_c": "Avg temp (°C)", "city": "City"},
+temp_chart = (
+    alt.Chart(filtered)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("forecast_date:T", title=None),
+        y=alt.Y("avg_temperature_c:Q", title="°C"),
+        color=alt.Color(
+            "city:N",
+            title=None,
+            scale=COLOR_SCALE,
+            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+        ),
+        tooltip=["forecast_date:T", "city:N", "avg_temperature_c:Q"],
+    )
+    .properties(height=320)
 )
-temp_fig.update_layout(height=520, legend_title_text="City (click to toggle)")
-st.plotly_chart(temp_fig, use_container_width=True)
+st.altair_chart(temp_chart, use_container_width=True)
 
 st.subheader("Max wind speed by day")
-wind_fig = px.bar(
-    filtered.sort_values("forecast_date"),
-    x="forecast_date",
-    y="max_wind_speed_kmh",
-    color="city",
-    color_discrete_map=CITY_COLORS,
-    barmode="group",
-    labels={"forecast_date": "Forecast date", "max_wind_speed_kmh": "Max wind (km/h)", "city": "City"},
+wind_chart = (
+    alt.Chart(filtered)
+    .mark_bar()
+    .encode(
+        x=alt.X("forecast_date:T", title=None),
+        y=alt.Y("max_wind_speed_kmh:Q", title="km/h"),
+        color=alt.Color(
+            "city:N",
+            title=None,
+            scale=COLOR_SCALE,
+            legend=alt.Legend(orient="bottom", direction="horizontal", columns=_legend_columns(len(selected_cities))),
+        ),
+        tooltip=["forecast_date:T", "city:N", "max_wind_speed_kmh:Q"],
+    )
+    .properties(height=320)
 )
-wind_fig.update_layout(height=520, legend_title_text="City (click to toggle)")
-st.plotly_chart(wind_fig, use_container_width=True)
+st.altair_chart(wind_chart, use_container_width=True)
 
 st.subheader("Gold layer (daily, per city)")
 st.dataframe(filtered, use_container_width=True)
