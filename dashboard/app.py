@@ -23,7 +23,7 @@ st.title("Weather Medallion Pipeline")
 st.caption(
     "Bronze → Silver → Gold ELT pipeline on top of the Open-Meteo API. "
     "Ingestion runs daily via GitHub Actions"
-    "from the gold layer."
+    " from the gold layer."
 )
 
 
