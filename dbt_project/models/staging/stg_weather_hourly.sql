@@ -51,3 +51,12 @@ select
     wind_speed_kmh,
     ingested_at
 from unnested
+-- Not every location Open-Meteo covers uses a weather model with a full
+-- forecast_days-length horizon (see ingestion/fetch_weather.py) -- some
+-- regions default to a shorter-range model, so the tail end of the
+-- requested window comes back with null temperature/wind for those
+-- hours rather than an error. Drop those hours here instead of letting
+-- nulls reach gold: a city's forecast window simply ends where its
+-- model's coverage ends, it isn't broken data.
+where temperature_c is not null
+    and wind_speed_kmh is not null
