@@ -17,6 +17,15 @@ is what lets gold.forecast_accuracy_by_lead_time keep gaining overlap with
 the DE pipeline's forecast snapshots instead of freezing at whatever date
 the first backfill happened to run on.
 
+The daily re-run passes --window-days (a short recent window, e.g. 14 days)
+instead of re-requesting the full --years range: the full history is
+already landed from the initial manual backfill, a daily run only needs to
+extend the frontier a day or two further, and asking for less data per city
+keeps each run fast and light. Both the years-based and window-based paths
+also pace requests and retry on HTTP 429 -- firing 50+ archive-API requests
+back-to-back with no delay reliably trips Open-Meteo's rate limit, which
+silently drops most of a run's cities (see REQUEST_DELAY_SECONDS below).
+
 No API key required. Same bronze-layer philosophy as fetch_weather.py:
 land the raw JSON untouched, let dbt do the parsing/typing in the silver
 layer (stg_weather_historical_daily).
@@ -27,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -46,6 +56,15 @@ DEFAULT_DB_PATH = REPO_ROOT / "data" / "weather.duckdb"
 # recent data than that reliably comes back with nulls.
 ARCHIVE_LAG_DAYS = 5
 
+# Firing 50+ requests at archive-api.open-meteo.com back-to-back with no
+# delay reliably trips its rate limit partway through the city list (seen
+# in practice: ~16 of 54 cities succeed, the rest come back 429). A small
+# delay between requests plus a couple of backoff retries on 429 gets every
+# city through instead of silently losing most of a run.
+REQUEST_DELAY_SECONDS = 1.5
+MAX_RETRIES_ON_429 = 3
+RETRY_BACKOFF_SECONDS = 5
+
 
 def fetch_city_history(session: requests.Session, city: dict, start: date, end: date) -> dict:
     params = {
@@ -56,9 +75,16 @@ def fetch_city_history(session: requests.Session, city: dict, start: date, end: 
         "daily": DAILY_FIELDS,
         "timezone": "auto",
     }
-    resp = session.get(ARCHIVE_API_URL, params=params, timeout=60)
-    resp.raise_for_status()
-    return resp.json()
+    for attempt in range(MAX_RETRIES_ON_429 + 1):
+        resp = session.get(ARCHIVE_API_URL, params=params, timeout=60)
+        if resp.status_code == 429 and attempt < MAX_RETRIES_ON_429:
+            wait = RETRY_BACKOFF_SECONDS * (attempt + 1)
+            print(f"[warn] rate limited on {city['city']}, retrying in {wait}s", file=sys.stderr)
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise RuntimeError(f"unreachable: retry loop for {city['city']} exited without returning")
 
 
 def land_bronze(con: duckdb.DuckDBPyConnection, rows: list[dict]) -> int:
@@ -92,15 +118,31 @@ def land_bronze(con: duckdb.DuckDBPyConnection, rows: list[dict]) -> int:
     return len(rows)
 
 
-def run(years: int = 2, db_path: Path = DEFAULT_DB_PATH, cities: list[dict] | None = None) -> int:
+def run(
+    years: int = 2,
+    db_path: Path = DEFAULT_DB_PATH,
+    cities: list[dict] | None = None,
+    window_days: int | None = None,
+) -> int:
+    """Fetch each city's actuals history and land it into bronze.
+
+    window_days, when given, overrides `years` and pulls just a short
+    recent window ending at the usual ARCHIVE_LAG_DAYS-adjusted date --
+    for the daily catch-up run, which only needs to extend the frontier a
+    little further, not re-pull the whole archive. `years` still controls
+    the one-time/manual full backfill.
+    """
     cities = cities if cities is not None else CITIES
     ingested_at = datetime.now(timezone.utc)
     end = date.today() - timedelta(days=ARCHIVE_LAG_DAYS)
-    start = end - timedelta(days=365 * years)
+    span_days = window_days if window_days is not None else 365 * years
+    start = end - timedelta(days=span_days)
 
     rows = []
     with requests.Session() as session:
-        for city in cities:
+        for i, city in enumerate(cities):
+            if i > 0:
+                time.sleep(REQUEST_DELAY_SECONDS)
             try:
                 payload = fetch_city_history(session, city, start, end)
             except requests.RequestException as exc:
@@ -135,7 +177,13 @@ def run(years: int = 2, db_path: Path = DEFAULT_DB_PATH, cities: list[dict] | No
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backfill actual historical weather into the bronze layer")
-    parser.add_argument("--years", type=int, default=2)
+    parser.add_argument("--years", type=int, default=2, help="Full backfill window (ignored if --window-days is given).")
+    parser.add_argument(
+        "--window-days",
+        type=int,
+        default=None,
+        help="Pull only the last N days instead of --years -- for the daily catch-up run.",
+    )
     parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
     args = parser.parse_args()
-    run(years=args.years, db_path=args.db_path)
+    run(years=args.years, db_path=args.db_path, window_days=args.window_days)

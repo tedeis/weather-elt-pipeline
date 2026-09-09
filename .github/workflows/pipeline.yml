@@ -61,7 +61,7 @@ jobs:
           # sidesteps that regardless of where this step runs from.
           DBT_DUCKDB_PATH: ${{ github.workspace }}/data/weather.duckdb
         run: |
-          python3 ds/backfill_historical.py
+          python3 ds/backfill_historical.py --window-days 14
           dbt run --select tag:ds --project-dir dbt_project --profiles-dir dbt_project
           python3 ds/eval_forecast_accuracy.py
 
