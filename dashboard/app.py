@@ -108,7 +108,7 @@ temp_chart = (
     .mark_line(point=True)
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("avg_temperature_c:Q", title="°C"),
+        y=alt.Y("avg_temperature_c:Q", title="°C", titleAngle=-90),
         color=alt.Color(
             "city:N",
             title=None,
@@ -137,7 +137,7 @@ wind_chart = (
     .mark_bar()
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("max_wind_speed_kmh:Q", title="km/h"),
+        y=alt.Y("max_wind_speed_kmh:Q", title="km/h", titleAngle=-90),
         color=alt.Color(
             "city:N",
             title=None,
