@@ -40,7 +40,10 @@ def fetch_city(session: requests.Session, city: dict) -> dict:
         "latitude": city["latitude"],
         "longitude": city["longitude"],
         "hourly": HOURLY_FIELDS,
-        "forecast_days": 3,
+        # Open-Meteo's free forecast API supports up to 16 days --
+        # bumped up from 3 so the dashboard has a real range of dates
+        # to filter/plot instead of just today + the next two days.
+        "forecast_days": 16,
         "timezone": "auto",
     }
     resp = session.get(API_URL, params=params, timeout=30)

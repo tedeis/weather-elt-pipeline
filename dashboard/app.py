@@ -78,6 +78,11 @@ COLOR_SCALE = alt.Scale(domain=cities, range=[CITY_COLORS[c] for c in cities])
 # put the picker in the sidebar so it doesn't compete for width with the
 # charts.
 DEFAULT_CITY_COUNT = 6
+# DuckDB DATE columns come back through pandas as Timestamp, not plain
+# datetime.date -- normalize here so what seeds the widget matches the
+# plain dates st.date_input hands back on interaction.
+min_forecast_date = df["forecast_date"].min().date()
+max_forecast_date = df["forecast_date"].max().date()
 with st.sidebar:
     st.header("Filter")
     select_all = st.checkbox("Select all cities", value=False)
@@ -87,12 +92,39 @@ with st.sidebar:
         default=cities if select_all else cities[:DEFAULT_CITY_COUNT],
     )
 
+    st.divider()
+    date_range = st.date_input(
+        "Date range",
+        value=(min_forecast_date, max_forecast_date),
+        min_value=min_forecast_date,
+        max_value=max_forecast_date,
+    )
+
 if not selected_cities:
     st.info("Select at least one city in the sidebar to see its charts.")
     st.stop()
 
-filtered = df[df["city"].isin(selected_cities)]
-filtered_hourly = df_hourly[df_hourly["city"].isin(selected_cities)]
+# st.date_input returns a single date while the user has only picked one
+# end of the range (mid-click), and a two-element tuple once both ends are
+# set -- treat a lone date as a single-day range rather than erroring.
+if isinstance(date_range, tuple) and len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    single_date = date_range[0] if isinstance(date_range, tuple) else date_range
+    start_date = end_date = single_date
+
+filtered = df[
+    df["city"].isin(selected_cities)
+    # forecast_date comes back from DuckDB as datetime64, which pandas
+    # won't compare directly against plain datetime.date objects from
+    # st.date_input (raises TypeError) -- go through .dt.date on both
+    # sides so it's a date-to-date comparison.
+    & df["forecast_date"].dt.date.between(start_date, end_date)
+]
+filtered_hourly = df_hourly[
+    df_hourly["city"].isin(selected_cities)
+    & df_hourly["forecast_time"].dt.date.between(start_date, end_date)
+]
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Cities tracked", f"{df['city'].nunique()}")
