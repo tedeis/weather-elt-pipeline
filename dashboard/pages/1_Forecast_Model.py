@@ -56,8 +56,7 @@ st.dataframe(
     use_container_width=True,
 )
 st.caption(
-    f"Lowest MAE: **{best}**. The persistence baseline is the bar to beat -- "
-    "if a fitted model can't outperform 'tomorrow = today', it isn't earning its complexity."
+    f"Lowest MAE: **{best}**. "
 )
 
 col1, col2 = st.columns([2, 1])
