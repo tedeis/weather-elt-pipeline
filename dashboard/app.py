@@ -108,7 +108,7 @@ temp_chart = (
     .mark_line(point=True)
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("avg_temperature_c:Q", title="°C"),
+        y=alt.Y("avg_temperature_c:Q", axis=alt.Axis(title="°C", titleAngle=-90, titlePadding=10)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -123,6 +123,12 @@ temp_chart = (
                 direction="horizontal",
                 columns=_legend_columns(len(selected_cities)),
                 values=selected_cities,
+                # Vega-Lite caps legends at 30 entries by default and
+                # collapses the rest into an "...N entries" summary --
+                # harmless with a handful of cities selected, but with all
+                # 54+ selected it silently hides most of them. Raise the
+                # cap well above our city count so nothing gets collapsed.
+                symbolLimit=500,
             ),
         ),
         tooltip=["forecast_date:T", "city:N", "avg_temperature_c:Q"],
@@ -137,7 +143,7 @@ wind_chart = (
     .mark_bar()
     .encode(
         x=alt.X("forecast_date:T", title=None),
-        y=alt.Y("max_wind_speed_kmh:Q", title="km/h"),
+        y=alt.Y("max_wind_speed_kmh:Q", axis=alt.Axis(title="km/h", titleAngle=-90, titlePadding=10)),
         color=alt.Color(
             "city:N",
             title=None,
@@ -147,6 +153,7 @@ wind_chart = (
                 direction="horizontal",
                 columns=_legend_columns(len(selected_cities)),
                 values=selected_cities,
+                symbolLimit=500,
             ),
         ),
         tooltip=["forecast_date:T", "city:N", "max_wind_speed_kmh:Q"],
