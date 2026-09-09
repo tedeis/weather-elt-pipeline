@@ -38,6 +38,15 @@ def load_gold() -> pd.DataFrame:
         con.close()
 
 
+@st.cache_data(ttl=3600)
+def load_gold_hourly() -> pd.DataFrame:
+    con = duckdb.connect(str(DB_PATH), read_only=True)
+    try:
+        return con.execute("SELECT * FROM gold.gold_weather_hourly ORDER BY forecast_time, city").df()
+    finally:
+        con.close()
+
+
 if not DB_PATH.exists():
     st.error(
         "No data found yet. Run `python run_pipeline.py` from the repo root "
@@ -46,6 +55,7 @@ if not DB_PATH.exists():
     st.stop()
 
 df = load_gold()
+df_hourly = load_gold_hourly()
 
 cities = sorted(df["city"].unique())
 
@@ -82,6 +92,7 @@ if not selected_cities:
     st.stop()
 
 filtered = df[df["city"].isin(selected_cities)]
+filtered_hourly = df_hourly[df_hourly["city"].isin(selected_cities)]
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Cities tracked", f"{df['city'].nunique()}")
@@ -136,6 +147,31 @@ temp_chart = (
     .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
 )
 st.altair_chart(temp_chart, use_container_width=True)
+
+st.subheader("Temperature by hour")
+hourly_chart = (
+    alt.Chart(filtered_hourly)
+    .mark_line()
+    .encode(
+        x=alt.X("forecast_time:T", title=None),
+        y=alt.Y("temperature_c:Q", axis=alt.Axis(title="°C", titleAngle=-90, titlePadding=10)),
+        color=alt.Color(
+            "city:N",
+            title=None,
+            scale=COLOR_SCALE,
+            legend=alt.Legend(
+                orient="bottom",
+                direction="horizontal",
+                columns=_legend_columns(len(selected_cities)),
+                values=selected_cities,
+                symbolLimit=500,
+            ),
+        ),
+        tooltip=["forecast_time:T", "city:N", "temperature_c:Q"],
+    )
+    .properties(height=320 + 22 * (math.ceil(len(selected_cities) / _legend_columns(len(selected_cities))) - 1))
+)
+st.altair_chart(hourly_chart, use_container_width=True)
 
 st.subheader("Max wind speed by day")
 wind_chart = (

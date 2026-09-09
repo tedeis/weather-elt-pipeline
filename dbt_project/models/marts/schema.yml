@@ -18,3 +18,21 @@ models:
       - name: avg_temperature_c
         tests:
           - not_null
+
+  - name: gold_weather_hourly
+    description: Hourly per-city temperature for the dashboard's temperature-by-hour chart.
+    columns:
+      - name: city_hour_key
+        description: Surrogate key (md5 of city + forecast_time) enforcing one row per city per hour.
+        tests:
+          - not_null
+          - unique
+      - name: city
+        tests:
+          - not_null
+      - name: forecast_time
+        tests:
+          - not_null
+      - name: temperature_c
+        tests:
+          - not_null
