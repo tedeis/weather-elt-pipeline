@@ -11,6 +11,13 @@ name: Keep dashboard awake
 # Separate from pipeline.yml on purpose: that workflow refreshes data,
 # this one just keeps the deployed app reachable -- different concerns,
 # different schedules.
+#
+# NOTE: this uses a headless browser (Playwright), not curl. Streamlit
+# Community Cloud only resets its inactivity timer when a real viewer
+# session is established -- that requires the page's JS to run and open
+# a WebSocket back to the app. A plain curl request only fetches the
+# static HTML shell and gets a 200, but never creates a session, so it
+# does NOT prevent hibernation even though the workflow "succeeds".
 
 on:
   schedule:
@@ -21,16 +28,49 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Visit the dashboard to reset its inactivity timer
-        # Plain curl (no cookie jar, default curl user-agent) gets stuck
-        # in an infinite redirect loop against Streamlit Community Cloud
-        # -- its routing layer expects a persistent session cookie across
-        # the redirect chain, and a non-browser user-agent trips it up
-        # too. -c/-b give curl a cookie jar to carry across redirects,
-        # and -A sends a normal browser-like user-agent.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Playwright
         run: |
-          curl -sSL \
-            -c cookies.txt -b cookies.txt \
-            -A "Mozilla/5.0 (compatible; keep-alive-ping/1.0)" \
-            -o /dev/null -w "HTTP %{http_code}\n" \
-            https://tedeis-weather-dashboard.streamlit.app
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Visit the dashboard with a real browser session
+        run: |
+          python - <<'EOF'
+          from playwright.sync_api import sync_playwright
+          import sys
+
+          URL = "https://tedeis-weather-dashboard.streamlit.app"
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+
+              # Wait for actual network idle, not just the initial HTML --
+              # this is what forces the WebSocket handshake Streamlit
+              # needs to register a viewer session.
+              page.goto(URL, wait_until="networkidle", timeout=60000)
+
+              # If the app is asleep, Streamlit Cloud shows a "Yes, get
+              # this app back up!" button instead of the app itself.
+              # Click it if present so the app actually wakes and this
+              # run also recovers from a sleep, not just prevents future ones.
+              wake_button = page.get_by_text("get this app back up", exact=False)
+              if wake_button.count() > 0:
+                  print("App was asleep -- clicking wake button")
+                  wake_button.first.click()
+                  page.wait_for_timeout(15000)
+
+              # Give the session a few seconds to fully establish before
+              # closing, so it counts as a real visit.
+              page.wait_for_timeout(5000)
+
+              title = page.title()
+              print(f"Visited {URL} -- page title: {title!r}")
+
+              browser.close()
+          EOF
