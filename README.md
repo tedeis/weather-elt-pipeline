@@ -122,7 +122,7 @@ as more history accumulates to retrain on a growing dataset.
 - **A live public API** instead of a static CSV: this is a real ELT
   pipeline with incremental runs, not a one-off analysis of a dataset that
   never changes.
-- **A chronological, not random, train/test split** for the DS models: the
+- **A chronological train/test split** for the DS models: the
   classic time-series mistake is a random shuffle that leaks future rows
   into training. The hold-out here is strictly the most recent N days.
 - **A persistence baseline before any ML model**: reporting an XGBoost MAE
